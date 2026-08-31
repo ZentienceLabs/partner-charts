@@ -1,0 +1,6 @@
+HelmRepo: oci://registry.alchemistudio.ai/charts-public/app/charts
+HelmChart: alchemi-platform
+Vendor: AlchemiStudio
+DisplayName: AlchemiStudio Platform
+ChartMetadata:
+  kubeVersion: ">=1.27.0-0"
