@@ -1,0 +1,114 @@
+# Rancher Apps install form for alchemi-platform.
+# Images pull from our registry with a baked cred, and it runs in fixed-seats mode
+# (no license needed). For production (own registry + license), contact
+# support@alchemistudio.ai. Asks ONLY app config — VNet/nodes/cluster are
+# pre-provisioned. Fixed (NOT asked): registry creds (baked), license (Zenith),
+# redis (bundled), keycloak (bundled).
+questions:
+
+  # ─────────────── Access & TLS ───────────────
+  - variable: global.domain
+    label: "Base domain"
+    description: "Base domain. Each app is served at <subdomain>.<domain> (defaults below). e.g. alchemi.acme.com"
+    type: hostname
+    required: true
+    group: "Access & TLS"
+  # Per-app subdomains — override to change any app's hostname (blank/default keeps app/auth/ops/zenith).
+  - {variable: global.subdomains.app,    label: "Web subdomain",    type: string, default: "app",    group: "Access & TLS", description: "Web UI at <this>.<domain>"}
+  - {variable: global.subdomains.auth,   label: "Auth subdomain",   type: string, default: "auth",   group: "Access & TLS", description: "Keycloak login at <this>.<domain>"}
+  - {variable: global.subdomains.ops,    label: "Ops subdomain",    type: string, default: "ops",    group: "Access & TLS", description: "OpenObserve at <this>.<domain>"}
+  - {variable: global.subdomains.zenith, label: "Zenith subdomain", type: string, default: "zenith", group: "Access & TLS", description: "Zenith console at <this>.<domain>"}
+  - variable: tls.mode
+    label: "TLS mode"
+    description: "selfsigned = quickest for testing; byo = provide an existing TLS secret; acme = Let's Encrypt."
+    type: enum
+    options: ["selfsigned", "byo", "acme"]
+    default: "selfsigned"
+    group: "Access & TLS"
+  - variable: tls.secretName
+    label: "Existing TLS secret name (byo)"
+    description: "Name of a pre-created wildcard TLS secret for *.<domain>."
+    type: string
+    default: "apisix-ssl-secret"
+    show_if: "tls.mode=byo"
+    group: "Access & TLS"
+
+  # NOTE (trial): the image registry + pull credentials are PRE-BAKED into this trial
+  # chart (images pull from alchemiacr.azurecr.io with a shared trial token), and the
+  # license runs in fixed-seats mode (managed by Zenith) — so neither is asked here.
+  # For production (your own registry + a license) contact support@alchemistudio.ai.
+
+  # ─────────────── Admin (first user + Keycloak) ───────────────
+  - variable: admin.email
+    label: "Admin email"
+    description: "First-user + Keycloak admin. MUST be the email you log in with. Initial password is generated (retrieve from the FIRST_USER_PASSWORD secret post-install)."
+    type: string
+    required: true
+    group: "Admin"
+  - variable: admin.name
+    label: "Admin display name (optional)"
+    type: string
+    group: "Admin"
+  - variable: admin.orgName
+    label: "Organization name (optional)"
+    type: string
+    group: "Admin"
+
+  # ─────────────── Database ───────────────
+  - variable: postgres.mode
+    label: "PostgreSQL"
+    description: "bundled = in-cluster pgvector. external = your managed PostgreSQL (pre-create the DBs + vector/uuid-ossp/pgcrypto extensions)."
+    type: enum
+    options: ["bundled", "external"]
+    default: "bundled"
+    group: "Database"
+  - {variable: postgres.external.host,            label: "Host",             type: string,   required: true, show_if: "postgres.mode=external", group: "Database"}
+  - {variable: postgres.external.port,            label: "Port",             type: int,      default: 5432,  show_if: "postgres.mode=external", group: "Database"}
+  - {variable: postgres.external.database,        label: "App database",     type: string,   default: "alchemiapp_db", show_if: "postgres.mode=external", group: "Database"}
+  - {variable: postgres.external.computeDatabase, label: "Compute database", type: string,   default: "compute_db",     show_if: "postgres.mode=external", group: "Database"}
+  - {variable: postgres.external.user,            label: "User",             type: string,   default: "alchemiadmin",   show_if: "postgres.mode=external", group: "Database"}
+  - {variable: postgres.external.password,        label: "Password",         type: password, required: true, show_if: "postgres.mode=external", group: "Database"}
+  - variable: postgres.external.sslMode
+    label: "SSL mode"
+    type: enum
+    options: ["require", "disable"]
+    default: "require"
+    show_if: "postgres.mode=external"
+    group: "Database"
+
+  # ─────────────── Object storage ───────────────
+  - variable: objectStore.mode
+    label: "Object storage"
+    description: "bundled = in-cluster SeaweedFS (S3). external = Azure Blob (provide a connection string OR account name+key+endpoint)."
+    type: enum
+    options: ["bundled", "external"]
+    default: "bundled"
+    group: "Object Storage"
+  - {variable: objectStore.external.connectionString, label: "Azure connection string (wins if set)", type: password, show_if: "objectStore.mode=external", group: "Object Storage"}
+  - {variable: objectStore.external.accountName,      label: "Storage account name",                  type: string,   show_if: "objectStore.mode=external", group: "Object Storage"}
+  - {variable: objectStore.external.accountKey,       label: "Storage account key",                   type: password, show_if: "objectStore.mode=external", group: "Object Storage"}
+  - {variable: objectStore.external.blobEndpoint,     label: "Blob endpoint",                         type: string,   show_if: "objectStore.mode=external", group: "Object Storage"}
+
+  # ─────────────── Sizing ───────────────
+  - variable: tier
+    label: "Deployment tier"
+    description: "Resource / HPA presets."
+    type: enum
+    options: ["basic", "standard", "premium"]
+    default: "basic"
+    group: "Sizing"
+
+  # ─────────────── Email (optional) ───────────────
+  - variable: smtp.mode
+    label: "Email (SMTP)"
+    type: enum
+    options: ["none", "smtp"]
+    default: "none"
+    group: "Email"
+  - {variable: smtp.host,     label: "SMTP host",    type: string,   show_if: "smtp.mode=smtp", group: "Email"}
+  - {variable: smtp.port,     label: "SMTP port",    type: int, default: 587, show_if: "smtp.mode=smtp", group: "Email"}
+  - {variable: smtp.user,     label: "SMTP user",    type: string,   show_if: "smtp.mode=smtp", group: "Email"}
+  - {variable: smtp.password, label: "SMTP password",type: password, show_if: "smtp.mode=smtp", group: "Email"}
+  - {variable: smtp.from,     label: "From address", type: string,   show_if: "smtp.mode=smtp", group: "Email"}
+
+  # LLM provider keys are not asked in the form — configured post-install (or via Zenith).

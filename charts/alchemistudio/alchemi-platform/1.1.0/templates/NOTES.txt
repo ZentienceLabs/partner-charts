@@ -1,0 +1,30 @@
+Alchemi Platform {{ .Chart.AppVersion }} installed as release "{{ .Release.Name }}".
+
+Domain: {{ required "global.domain is required" .Values.global.domain }}
+
+  App     https://{{ include "alchemi.appHost" . }}
+  Auth    https://{{ include "alchemi.authHost" . }}   (Keycloak)
+  Ops     https://{{ include "alchemi.opsHost" . }}
+{{- if .Values.gateway.exposeZenith }}
+  Zenith  https://{{ include "alchemi.zenithHost" . }}
+{{- end }}
+
+Next steps:
+1) DNS — point these hostnames at your gateway's external IP:
+     kubectl -n apisix get svc apisix-gateway   # grab EXTERNAL-IP
+   (All subdomains resolve to the SAME IP; APISIX routes by Host — see the
+    alchemi-endpoints ConfigMap and the {{ .Release.Name }}-apisix-routes Job.)
+
+2) TLS — {{ if .Values.tls.enabled }}BYO secret "{{ .Values.tls.secretName }}" must hold the *.{{ .Values.global.domain }} wildcard cert (namespace apisix).{{ else }}TLS is disabled.{{ end }}
+
+3) Keycloak — register the web client redirect URI:
+     {{ include "alchemi.redirectUri" . }}
+   (mismatch here = login fails). Realm bootstrap + first admin: run the seed
+   (releases/v0.1.0/05-scripts) — remember: migrate != seed.
+
+4) App wiring — the app charts read hosts from the "alchemi-endpoints" ConfigMap.
+   Confirm they envFrom it (see endpoints-configmap.yaml integration note).
+
+Still to layer on the gateway (from on-prem apisix): the license lua plugin
+(+ lua_shared_dict license_cache) and the 256k proxy buffers (Keycloak cookie
+-> 502 without them).
