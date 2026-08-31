@@ -1,4 +1,4 @@
-HelmRepo: oci://registry.alchemistudio.ai/charts-public/app/charts
+HelmRepo: https://zentiencelabs.github.io/alchemi-public-helm-charts
 HelmChart: alchemi-platform
 Vendor: AlchemiStudio
 DisplayName: AlchemiStudio Platform
